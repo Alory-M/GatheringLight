@@ -38,6 +38,10 @@ namespace PixelMoments
         private void Start()
         {
             Application.targetFrameRate=60;Screen.orientation=ScreenOrientation.Portrait;
+#if UNITY_STANDALONE && !UNITY_EDITOR
+            // Set the whole player window, including the home and completion screens.
+            Screen.SetResolution(900,1600,FullScreenMode.Windowed);
+#endif
             font=Resources.Load<Font>("NotoSansSC");
             if(!font)font=Font.CreateDynamicFontFromOSFont(new[]{"Noto Sans CJK SC","Microsoft YaHei","Arial"},24);
             rounded=MakeRound();
@@ -48,12 +52,12 @@ namespace PixelMoments
             var obj=new GameObject("Canvas",typeof(Canvas),typeof(CanvasScaler),typeof(GraphicRaycaster));
             canvas=obj.GetComponent<Canvas>();canvas.renderMode=RenderMode.ScreenSpaceOverlay;
             var scaler=obj.GetComponent<CanvasScaler>();scaler.uiScaleMode=CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution=new Vector2(900,1600);scaler.matchWidthOrHeight=.5f;
+            scaler.referenceResolution=new Vector2(900,1600);scaler.matchWidthOrHeight=0f;
             root=obj.GetComponent<RectTransform>();
             var backdrop=Panel(root,"Paper",0,0,900,1600,Color.white);
             backdrop.rectTransform.anchorMin=Vector2.zero;backdrop.rectTransform.anchorMax=Vector2.one;
             backdrop.rectTransform.sizeDelta=Vector2.zero;backdrop.sprite=MakePaper();backdrop.type=Image.Type.Simple;
-            frame=Panel(root,"Portrait safe frame",0,0,900,1600,Color.clear).rectTransform;
+            frame=Panel(root,"Full screen UI",0,0,900,1600,Color.clear).rectTransform;
             frame.GetComponent<Image>().raycastTarget=false;FitSafeArea();ShowHome();
         }
         private void Update()
@@ -64,15 +68,20 @@ namespace PixelMoments
         {
             if(!frame)return;
             lastSafe=Screen.safeArea;lastScreen=new Vector2(Screen.width,Screen.height);
-            float scale=Mathf.Max(.01f,canvas.scaleFactor);
-            frame.localScale=Vector3.one*Mathf.Min(lastSafe.width/scale/900,lastSafe.height/scale/1600);
-            frame.anchoredPosition=(lastSafe.center-lastScreen*.5f)/scale;
+            // Stretch the UI root to the actual screen; never fit a portrait module
+            // inside a separate landscape render surface. Only inset for device cutouts.
+            frame.localScale=Vector3.one;
+            frame.anchorMin=new Vector2(lastSafe.xMin/Screen.width,lastSafe.yMin/Screen.height);
+            frame.anchorMax=new Vector2(lastSafe.xMax/Screen.width,lastSafe.yMax/Screen.height);
+            frame.offsetMin=frame.offsetMax=Vector2.zero;
         }
         private void NewPage(string title)
         {
             generation++;stroke=null;StopAllCoroutines();
             if(page) {page.gameObject.SetActive(false);Destroy(page.gameObject);}
             page=Panel(frame,title,0,0,900,1600,Color.clear).rectTransform;
+            page.anchorMin=Vector2.zero;page.anchorMax=Vector2.one;
+            page.offsetMin=page.offsetMax=Vector2.zero;
             page.GetComponent<Image>().raycastTarget=false;
         }
         private void ShowHome()
