@@ -25,6 +25,8 @@ namespace PixelMoments.Editor
             PlayerSettings.defaultScreenWidth = 900;
             PlayerSettings.defaultScreenHeight = 1600;
             PlayerSettings.defaultInterfaceOrientation = UIOrientation.Portrait;
+            PlayerSettings.defaultIsNativeResolution = false;
+            PlayerSettings.fullScreenMode = FullScreenMode.Windowed;
             PlayerSettings.colorSpace = ColorSpace.Gamma;
         }
         [MenuItem("Pixel Moments/Build Android APK")]
