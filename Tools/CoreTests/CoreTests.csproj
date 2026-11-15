@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><TargetFramework>net8.0</TargetFramework><IsTestProject>true</IsTestProject><EnableDefaultCompileItems>false</EnableDefaultCompileItems></PropertyGroup>
   <ItemGroup>
-    <Compile Include="../../Assets/Scripts/Puzzle.cs" Link="Puzzle.cs" />
+    <Compile Include="../../Assets/Scripts/*.cs" Exclude="../../Assets/Scripts/GameView.cs;../../Assets/Scripts/BoardInput.cs" />
     <Compile Include="../../Assets/Tests/EditMode/PuzzleTests.cs" Link="PuzzleTests.cs" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <PackageReference Include="NUnit" Version="3.13.3" />

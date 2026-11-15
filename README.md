@@ -1,45 +1,64 @@
 # 像素拾光 · Pixel Moments
 
-基于《像素拾光 游戏策划案 V1.0》的 Unity 数织游戏 Demo。目标编辑器：**Unity 2022.3.62f3c1（中国版）**，16:9 横屏，移动端触屏和桌面鼠标共用 UI。
+**Unity 2022.3.62f3c1（中国版）** 数织解谜游戏。手机 **9:16 竖屏**，内部设计分辨率 900×1600；暖纸底色搭配鲜明的黄、橙、绿、蓝，平面像素画与轻微纸张颗粒，避免塑料高光。
 
-## 打开试玩
+## 打开与试玩
 
-1. 在 Unity Hub 中添加此仓库，使用 **2022.3.62f3c1** 打开。允许 Package Manager 解析 UGUI 与 Test Framework。
-2. 打开 `Assets/Scenes/PixelMoments.unity`，点击 Play。界面和声音由运行时代码生成，不依赖外部服务或密钥。
-3. 「玩法 ?」查看说明；选择涂色、叉号或擦除，再点击格子。也可选择循环模式。
-4. 构建 Windows：安装对应 Unity Windows Build Support，选择菜单 `Pixel Moments > Build Windows Demo`。产物在 `Builds/Windows`。
+1. Unity Hub 添加仓库，用 **2022.3.62f3c1** 打开，等待 UGUI 与 Test Framework 解析完成。
+2. 打开 `Assets/Scenes/PixelMoments.unity`；Game 视图选择 **9:16 / 900×1600**，点击 Play。
+3. 从主页选择关卡。选择「涂色」「叉号」或「擦除」后，点击或按住并横向／纵向滑动。
+4. 起点格立即标记，首次跨格移动锁定一行或一列；快速滑动会补齐中间格，回划同一格不重复提交。松手后可以另起一笔。
+5. 全部 225 格都正确才通关，图像从上到下显色。前两关点「下一关」，第三关点「返回主页」。完成画面保留到点击按钮，不自动跳走。
 
-## Demo 内容
+界面适配手机安全区和不同比例，优先保留完整的 9:16 内容；较长或较宽的屏幕会留白。支持单指触屏和鼠标左键拖动，多指不会同时画多笔。
 
-- 五角星 5×5 棋盘，由答案自动生成行列线索，穷举验证唯一解。
-- 三态标记、5 点推理值、逐次错误扣分、归零锁定、重置。
-- 必须全部 25 格正确；通关后禁用输入与重置，揭图并播放柔和提示音。
-- 错误短闪、点击微动、锁定变暗、通关缩放与金色边缘脉冲。
-- 明快纸感配色：向日葵黄、珊瑚橙、草木绿、天蓝与暖纸底。平面圆角色块，无材质高光或立体塑料效果。
-- 内置中文字体（Noto Sans SC，SIL OFL，许可证随资源附带）和程序合成提示音。无背景音乐。
+## 三幅完整画作
 
-## 验证
+| 关卡 | 难度 | 内容 | 行线索初始可确定格数 | 行列分段总数 |
+| --- | --- | --- | --- | --- |
+| 向阳花开 | 入门 | 金黄花盘、种子、绿叶与花盆 | 75 | 38 |
+| 晴日小屋 | 进阶 | 珊瑚屋顶、烟囱、留白窗格、木门与草地 | 59 | 44 |
+| 花间来信 | 挑战 | 蓝绿上翅、橙黄下翅、对称斑纹与触角 | 31 | 60 |
+
+三个关卡均为 **15×15、唯一解**，能通过行列约束传播解出；难度梯度来自更少的初始确定格和更多分段，需要更多交叉推理。难度标签是设计梯度，仍需真人试玩校准。
+
+![三幅画作预览（答案展示，非 Unity 截图）](Documentation/Art/Levels.png)
+
+## 规则
+
+每关 5 点推理值。错误填色或叉号扣 1 点；正确标记、擦除、重复提交同一状态不扣分。降至 0 后棋盘锁定，重置会清除全部标记并恢复 5 点。滑动并非免费试错：每个新格的错误提交仍各扣 1 点，归零立即停止。
+
+完成状态不可再改图或重置。返回主页后可以重新选择任意关卡。主页收集勾选仅记录本次应用运行，退出不保存棋盘进度。
+
+## 构建
+
+- Android：通过 Hub 安装 **Android Build Support / SDK / NDK / OpenJDK**。菜单 `Pixel Moments > Build Android APK`，生成 `Builds/Android/PixelMoments.apk`（ARM64 / IL2CPP，最低 Android 6.0）。
+- Windows：安装 Windows Build Support，菜单 `Pixel Moments > Build Windows Demo`，生成 `Builds/Windows/PixelMoments.exe`，同样为竖屏窗口。
+- 命令行（指定编辑器已经安装且激活时）：
+
+```sh
+"$UNITY_EDITOR" -batchmode -nographics -quit -projectPath "$PWD" -executeMethod PixelMoments.Editor.ProjectSetup.BuildAndroid -logFile Builds-unity.log
+```
+
+**当前云环境没有 Unity 编辑器和许可证，没有生成或验收 APK / EXE。**
+
+## 测试与结构
 
 Unity：`Window > General > Test Runner > EditMode > Run All`。
 
-可选独立逻辑测试（.NET SDK 8）：
+独立规则测试（.NET SDK 8）：
 
 ```sh
 dotnet test Tools/CoreTests/CoreTests.csproj
 ```
 
-命令行构建（已安装且已激活指定 Unity 编辑器时）：
+本次独立测试 **22 项通过，0 失败，0 跳过**；覆盖唯一解、难度指标、225 格通关、错误锁定重置、滑动补格与去重、三关流程。详情及手机验收步骤见 [Validation.md](Documentation/Validation.md)。
 
-```sh
-"$UNITY_EDITOR" -batchmode -nographics -quit -projectPath "$PWD" -executeMethod PixelMoments.Editor.ProjectSetup.BuildWindows -logFile Builds-unity.log
-```
+- `Level.cs`：三幅彩色像素画和关卡配置，自动生成线索。
+- `Puzzle.cs`：逐格规则与主页／三关流程。
+- `LineStroke.cs`：与 Unity 解耦的行列锁定、补格和去重。
+- `NonogramSolver.cs`：题目候选生成、约束传播与唯一解验证。
+- `BoardInput.cs`：单指／鼠标手势采集。
+- `GameView.cs`：竖屏主页、棋盘、工具、揭图与通关导航。
 
-当前云环境不包含 Unity 编辑器与许可证，不能据此宣称 Unity 编译、画面或构建已通过；具体结果见 `Documentation/Validation.md`。
-
-## 结构与边界
-
-`Puzzle.cs` 是无 Unity 依赖的规则模型；`GameView.cs` 构建 UI、处理反馈与音效；`ProjectSetup.cs` 注册场景和 Windows 构建入口。测试直接使用正式规则模型。
-
-本次实现范围为策划案必须实现的首关 Demo，不包含策划建议中的后续关卡、题库编辑器、存档或 15 秒自动录屏。无时间限制。重复提交同一状态不重复扣值；清空标记不扣值。循环模式遵守每次新错误标记扣分，推荐使用直接涂色／叉号模式。
-
-项目代码完成后直接提交 GitHub；不将 Library、缓存、构建产物或密钥入库。
+中文字体为 Noto Sans SC（SIL OFL，许可证和来源随项目提供）；音效为程序合成，无背景音乐。源码直接提交 GitHub，不提交 Library、缓存、构建产物或密钥。

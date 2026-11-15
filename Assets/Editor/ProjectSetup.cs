@@ -22,10 +22,24 @@ namespace PixelMoments.Editor
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
             PlayerSettings.companyName = "GatheringLight";
             PlayerSettings.productName = "像素拾光 Pixel Moments";
-            PlayerSettings.defaultScreenWidth = 1600;
-            PlayerSettings.defaultScreenHeight = 900;
-            PlayerSettings.defaultInterfaceOrientation = UIOrientation.LandscapeLeft;
+            PlayerSettings.defaultScreenWidth = 900;
+            PlayerSettings.defaultScreenHeight = 1600;
+            PlayerSettings.defaultInterfaceOrientation = UIOrientation.Portrait;
             PlayerSettings.colorSpace = ColorSpace.Gamma;
+        }
+        [MenuItem("Pixel Moments/Build Android APK")]
+        public static void BuildAndroid()
+        {
+            EnsureScene();
+            PlayerSettings.SetApplicationIdentifier(BuildTargetGroup.Android, "com.gatheringlight.pixelmoments");
+            PlayerSettings.SetScriptingBackend(BuildTargetGroup.Android, ScriptingImplementation.IL2CPP);
+            PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
+            PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel23;
+            EditorUserBuildSettings.buildAppBundle = false;
+            Directory.CreateDirectory("Builds/Android");
+            var result = BuildPipeline.BuildPlayer(new[] { ScenePath }, "Builds/Android/PixelMoments.apk", BuildTarget.Android, BuildOptions.None);
+            if (result.summary.result != UnityEditor.Build.Reporting.BuildResult.Succeeded)
+                throw new System.Exception("Android build failed: " + result.summary.result);
         }
         [MenuItem("Pixel Moments/Build Windows Demo")]
         public static void BuildWindows()

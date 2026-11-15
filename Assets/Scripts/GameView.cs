@@ -8,157 +8,233 @@ namespace PixelMoments
 {
     public sealed class GameView : MonoBehaviour
     {
-        private readonly Puzzle puzzle = new Puzzle();
-        private readonly Image[,] tiles = new Image[5,5];
-        private readonly Text[,] symbols = new Text[5,5];
-        private readonly Button[,] buttons = new Button[5,5];
-        private readonly int[,] revisions = new int[5,5];
-        private readonly Color cream = Hex("FFF6DE"), ink = Hex("343D46"), gold = Hex("F6BD35"), mint = Hex("A6CF6B");
+        private readonly Campaign campaign=new Campaign();
+        private readonly bool[] collected=new bool[3];
+        private Puzzle Puzzle => campaign.Current;
+        private Image[,] tiles;
+        private Text[,] symbols;
+        private int[,] revisions;
+        private readonly Color cream=Hex("FFF6DE"),ink=Hex("343D46"),gold=Hex("F6BD35"),mint=Hex("A6CF6B");
         private Font font;
-        private RectTransform root, board;
-        private Text hearts, status, progress, modeLabel;
+        private Canvas canvas;
+        private RectTransform root,frame,page,board;
+        private Text hearts,status,progress,modeLabel;
         private Button reset;
-        private GameObject help;
+        private GameObject help,next;
         private AudioSource sound;
-        private AudioClip tap, wrong, win;
-        private int mode; // paint, cross, erase, cycle
-        private int generation;
+        private AudioClip tap,wrong,win;
         private Sprite rounded;
+        private int mode,generation;
+        private LineStroke stroke;
+        private const float Pitch=42,BoardSize=Pitch*15;
+        private Rect lastSafe;
+        private Vector2 lastScreen;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Boot()
         {
-            if (FindObjectOfType<GameView>() == null) new GameObject("Pixel Moments").AddComponent<GameView>();
+            if(FindObjectOfType<GameView>()==null)new GameObject("Pixel Moments").AddComponent<GameView>();
         }
         private void Start()
         {
-            Application.targetFrameRate = 60;
-            Screen.orientation = ScreenOrientation.LandscapeLeft;
-            font = Resources.Load<Font>("NotoSansSC");
-            if (!font) font = Font.CreateDynamicFontFromOSFont(new[]{"Noto Sans CJK SC", "Microsoft YaHei", "Arial"}, 24);
-            rounded = MakeRound();
-            var cameraObject = new GameObject("Camera");
-            var camera = cameraObject.AddComponent<Camera>(); camera.clearFlags = CameraClearFlags.SolidColor;
-            camera.backgroundColor = cream; cameraObject.AddComponent<AudioListener>();
-            sound = gameObject.AddComponent<AudioSource>();
-            tap = Tone(660, .055f); wrong = Tone(220, .12f); win = Tone(880, .45f);
-            if (FindObjectOfType<EventSystem>() == null) new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
-            var canvas = new GameObject("Canvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
-            canvas.GetComponent<Canvas>().renderMode = RenderMode.ScreenSpaceOverlay;
-            var scaler = canvas.GetComponent<CanvasScaler>(); scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1600,900); scaler.matchWidthOrHeight = .5f;
-            root = canvas.GetComponent<RectTransform>();
-            var paper = Panel(root, "Backdrop", 0,0,1600,900,cream);
-            paper.sprite = MakePaper(); paper.type = Image.Type.Simple; paper.color = Color.white;
-            Panel(root, "Left decoration", -680,-340,260,260,Hex("9FC9E3"));
-            Panel(root, "Right decoration", 690,340,240,240,Hex("A6CF6B"));
-            Label(root,"PIXEL MOMENTS  /  慢慢来，光会亮", -510,369,520,38,20,ink);
-            Label(root,"像素拾光",-540,285,460,90,62,ink);
-            Label(root,"把每一个小小的确定，\n拼成闪闪发光的日常。",-530,182,480,90,25,ink);
-            Panel(root,"Chapter",-528,57,450,74,Hex("F2D38A"));
-            Label(root,"01   第一束星光     /     5 × 5",-528,57,430,50,23,ink);
-            hearts = Label(root,"",-530,-39,470,55,28,ink);
-            progress = Label(root,"",-530,-102,470,40,20,ink);
-            status = Label(root,"",-528,-202,470,115,23,ink);
-            Label(root,"没有倒计时 · 每一次思考都值得",-525,-353,470,36,19,ink);
-            Panel(root,"Puzzle card",267,31,910,694,Color.white);
-            Label(root,"星光小笺",267,331,700,44,28,ink);
-            Label(root,"数字是连续色块的长度，多段之间至少空一格",267,282,780,40,19,ink);
-            board = Panel(root,"Board",320,-11,445,445,Hex("DAD3BB")).rectTransform;
-            for(int r=0;r<5;r++) for(int c=0;c<5;c++) {
-                int row=r,col=c; float x=(c-2)*86, y=(2-r)*86;
-                var image=Panel(board,"Cell "+r+" "+c,x,y,78,78,cream); tiles[r,c]=image;
-                var b=image.gameObject.AddComponent<Button>(); b.targetGraphic=image;
-                b.onClick.AddListener(()=>Click(row,col)); buttons[r,c]=b;
-                symbols[r,c]=Label(image.rectTransform,"",0,0,72,72,36,ink);
+            Application.targetFrameRate=60;Screen.orientation=ScreenOrientation.Portrait;
+            font=Resources.Load<Font>("NotoSansSC");
+            if(!font)font=Font.CreateDynamicFontFromOSFont(new[]{"Noto Sans CJK SC","Microsoft YaHei","Arial"},24);
+            rounded=MakeRound();
+            var cameraObject=new GameObject("Camera");var camera=cameraObject.AddComponent<Camera>();
+            camera.clearFlags=CameraClearFlags.SolidColor;camera.backgroundColor=cream;cameraObject.AddComponent<AudioListener>();
+            sound=gameObject.AddComponent<AudioSource>();tap=Tone(660,.055f);wrong=Tone(220,.12f);win=Tone(880,.45f);
+            if(FindObjectOfType<EventSystem>()==null)new GameObject("EventSystem",typeof(EventSystem),typeof(StandaloneInputModule));
+            var obj=new GameObject("Canvas",typeof(Canvas),typeof(CanvasScaler),typeof(GraphicRaycaster));
+            canvas=obj.GetComponent<Canvas>();canvas.renderMode=RenderMode.ScreenSpaceOverlay;
+            var scaler=obj.GetComponent<CanvasScaler>();scaler.uiScaleMode=CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution=new Vector2(900,1600);scaler.matchWidthOrHeight=.5f;
+            root=obj.GetComponent<RectTransform>();
+            var backdrop=Panel(root,"Paper",0,0,900,1600,Color.white);
+            backdrop.rectTransform.anchorMin=Vector2.zero;backdrop.rectTransform.anchorMax=Vector2.one;
+            backdrop.rectTransform.sizeDelta=Vector2.zero;backdrop.sprite=MakePaper();backdrop.type=Image.Type.Simple;
+            frame=Panel(root,"Portrait safe frame",0,0,900,1600,Color.clear).rectTransform;
+            frame.GetComponent<Image>().raycastTarget=false;FitSafeArea();ShowHome();
+        }
+        private void Update()
+        {
+            if(lastSafe!=Screen.safeArea || lastScreen!=new Vector2(Screen.width,Screen.height))FitSafeArea();
+        }
+        private void FitSafeArea()
+        {
+            if(!frame)return;
+            lastSafe=Screen.safeArea;lastScreen=new Vector2(Screen.width,Screen.height);
+            float scale=Mathf.Max(.01f,canvas.scaleFactor);
+            frame.localScale=Vector3.one*Mathf.Min(lastSafe.width/scale/900,lastSafe.height/scale/1600);
+            frame.anchoredPosition=(lastSafe.center-lastScreen*.5f)/scale;
+        }
+        private void NewPage(string title)
+        {
+            generation++;stroke=null;StopAllCoroutines();
+            if(page) {page.gameObject.SetActive(false);Destroy(page.gameObject);}
+            page=Panel(frame,title,0,0,900,1600,Color.clear).rectTransform;
+            page.GetComponent<Image>().raycastTarget=false;
+        }
+        private void ShowHome()
+        {
+            campaign.Home();NewPage("Home");
+            Label(page,"PIXEL MOMENTS",0,696,800,40,24,ink);
+            Label(page,"像素拾光",0,594,820,110,72,ink);
+            Label(page,"用一点点确定，拼出完整的小美好。",0,500,800,55,28,ink);
+            var art=Panel(page,"Paper print",0,321,690,242,Color.white);
+            Miniature(art.transform,Levels.All[0],-205,0,12);
+            Label(art.transform,"收集三张日常小画\n15 × 15  ·  横纵推理\n\n已拾光  "+collected.Count(x=>x)+" / 3",94,0,430,190,28,ink);
+            for(int i=0;i<Levels.All.Count;i++) {
+                int index=i;var level=Levels.All[i];float y=83-i*204;
+                var card=Panel(page,"Level "+i,0,y,780,178,Color.white);
+                Panel(card.transform,"Accent",-339,0,18,116,Hex(level.Accent));
+                Label(card.transform,(i+1).ToString("00"),-270,0,100,85,45,Hex(level.Accent));
+                Label(card.transform,level.Title+(collected[i]?"  ✓":""),-10,36,370,56,35,ink);
+                Label(card.transform,level.Difficulty+"  ·  15 × 15",-10,-33,370,46,25,ink);
+                Action(card.transform,"拾光 →",266,0,170,75,()=>StartLevel(index),Hex(level.Accent));
             }
-            for(int i=0;i<5;i++) {
-                Label(root,string.Join("  ",puzzle.RowClues(i).Select(n=>n.ToString())),33,161-i*86,100,60,26,ink);
-                Label(root,string.Join("\n",puzzle.ColumnClues(i).Select(n=>n.ToString())),148+i*86,237,78,68,24,ink);
+            Label(page,"按住滑动，整行或整列连续标记\n没有倒计时，让思考慢一点。",0,-592,780,100,27,ink);
+            Label(page,"黄花 · 小屋 · 蝶舞",0,-717,780,42,22,ink);
+        }
+        private void Miniature(Transform parent,Level level,float x,float y,float pitch)
+        {
+            for(int r=0;r<15;r++)for(int c=0;c<15;c++)if(level.Answer(r,c)) {
+                var image=Panel(parent,"Pixel",x+(c-7)*pitch,y+(7-r)*pitch,pitch,pitch,Hex(level.PixelColor(r,c)));
+                image.raycastTarget=false;
             }
-            modeLabel=Label(root,"",270,-275,800,35,18,ink);
-            Action(root,"涂色",-5,-359,130,54,()=>SetMode(0),gold);
-            Action(root,"叉号",141,-359,130,54,()=>SetMode(1),mint);
-            Action(root,"擦除",287,-359,130,54,()=>SetMode(2),Hex("9FC9E3"));
-            Action(root,"循环",433,-359,130,54,()=>SetMode(3),Hex("F2D38A"));
-            reset=Action(root,"重置",656,-359,176,54,Reset,Hex("F28B64"));
-            Action(root,"玩法 ?",659,369,170,48,()=>help.SetActive(true),mint);
-            BuildHelp(); SetMode(0); Refresh();
+        }
+        private void StartLevel(int index) {campaign.Start(index);BuildGame();}
+        private void BuildGame()
+        {
+            NewPage("Puzzle");
+            var level=Puzzle.Level;
+            Action(page,"‹ 主页",-304,711,172,66,ShowHome,Hex("F2D38A"));
+            Label(page,"PIXEL MOMENTS",0,714,385,48,22,ink);
+            Action(page,"玩法 ?",315,711,150,66,()=>{stroke=null;help.SetActive(true);},mint);
+            Label(page,(campaign.Index+1).ToString("00")+" / 03    "+level.Title,0,614,800,70,43,ink);
+            Label(page,level.Difficulty+"  ·  "+level.Description,0,550,820,64,24,ink);
+            hearts=Label(page,"",-150,467,490,52,27,ink);
+            progress=Label(page,"",285,467,240,52,25,ink);
+            // 630px board + 168px row clues. Column clues stack in 8 fixed slots.
+            Panel(page,"Puzzle paper",0,-24,850,920,Color.white);
+            board=Panel(page,"Board",84,-133,BoardSize,BoardSize,Hex("DAD3BB")).rectTransform;
+            tiles=new Image[15,15];symbols=new Text[15,15];revisions=new int[15,15];
+            for(int r=0;r<15;r++)for(int c=0;c<15;c++) {
+                float x=(c-7)*Pitch,y=(7-r)*Pitch;
+                var image=Panel(board,"Cell "+r+" "+c,x,y,Pitch-3,Pitch-3,cream);
+                image.raycastTarget=false;tiles[r,c]=image;
+                symbols[r,c]=Label(image.transform,"",0,0,Pitch-3,Pitch-3,26,ink);
+            }
+            // Faint guides delineate 5×5 blocks without stealing touch targets.
+            for(int i=1;i<3;i++) {
+                Panel(board,"Column guide",-BoardSize/2+i*5*Pitch,0,2,BoardSize,ink).raycastTarget=false;
+                Panel(board,"Row guide",0,BoardSize/2-i*5*Pitch,BoardSize,2,ink).raycastTarget=false;
+            }
+            for(int i=0;i<15;i++) {
+                var rows=level.RowClues(i);var cols=level.ColumnClues(i);
+                // Row clues use fixed slots as well, so 8-segment clues never overflow.
+                int slots=Mathf.Max(1,rows.Length);
+                for(int j=0;j<slots;j++)Label(page,rows.Length==0?"0":rows[j].ToString(),-245-(slots-1-j)*23,161-i*Pitch,25,38,23,ink);
+                for(int j=0;j<Mathf.Max(1,cols.Length);j++)Label(page,cols.Length==0?"0":cols[j].ToString(),-210+i*Pitch,207+(Mathf.Max(1,cols.Length)-1-j)*27,Pitch,29,23,ink);
+            }
+            var input=board.gameObject.AddComponent<BoardInput>();
+            input.Begin=BeginStroke;input.Move=MoveStroke;input.End=()=>stroke=null;
+            status=Label(page,"",0,-534,800,80,26,ink);
+            modeLabel=Label(page,"",0,-603,820,46,25,ink);
+            Action(page,"● 涂色",-284,-677,186,78,()=>SetMode(0),gold);
+            Action(page,"× 叉号",-82,-677,186,78,()=>SetMode(1),mint);
+            Action(page,"擦除",120,-677,186,78,()=>SetMode(2),Hex("9FC9E3"));
+            reset=Action(page,"重置",322,-677,174,78,Reset,Hex("F28B64"));
+            next=Action(page,campaign.IsLast?"收集完成 · 返回主页":"画作已收好 · 下一关 →",0,-677,780,90,Advance,Hex(level.Accent)).gameObject;
+            next.SetActive(false);
+            Label(page,"长按滑动  ·  首次移动锁定行 / 列  ·  每格每次只标记一次",0,-754,860,38,20,ink);
+            BuildHelp();SetMode(0);Refresh();
         }
         private void BuildHelp()
         {
-            help=Panel(root,"How to play",0,0,1600,900,new Color(.30f,.27f,.32f,.55f)).gameObject;
-            var card=Panel(help.transform,"Help card",0,0,940,660,cream);
-            Label(card.transform,"欢迎拾起第一束光",0,234,820,65,40,ink);
-            Label(card.transform,"看数字，慢慢推理",0,157,800,45,27,ink);
-            Label(card.transform,"[3] 是连续 3 格色块；[1, 3] 两段之间至少空 1 格。\n\n涂色：确定是图案。叉号：确定是空白。\n全部 25 格都要标记正确，才能点亮星星。\n\n标错一次扣 1 点推理值，归零后只能重置。\n擦除不扣分；循环模式：未标记 → 涂色 → 叉号。\n循环中的每次错误标记都会扣分，请谨慎选择。",0,-40,800,330,25,ink);
-            Action(card.transform,"开始拾光",0,-248,280,64,()=>help.SetActive(false),gold);
+            help=Panel(page,"Help",0,0,900,1600,new Color(.20f,.23f,.27f,.65f)).gameObject;
+            var card=Panel(help.transform,"Help card",0,0,820,990,cream);
+            Label(card.transform,"一点点，拼出整幅画",0,385,750,80,40,ink);
+            Label(card.transform,"数字表示连续色块的长度。\n多段数字之间，至少留一个空白。\n\n选「涂色」或「叉号」，按住棋盘滑动。\n第一次移动决定横向或纵向，\n快速划过的格子也会连续标记。\n\n全部 225 格都要正确标记，才能揭图。\n每次错误标记扣 1 点，归零只能重置。\n擦除不扣分，同一次滑动不重复标记。\n\n完成后点下一关，第三关完成后返回主页。",0,0,740,650,29,ink);
+            Action(card.transform,"明白了，慢慢画",0,-389,540,88,()=>help.SetActive(false),gold);
             help.SetActive(false);
         }
         private void SetMode(int value)
         {
-            mode=value;
-            modeLabel.text=new[]{"● 涂色模式  ·  点击格子填入暖黄色", "× 叉号模式  ·  点击格子确认空白", "擦除模式  ·  清除标记，不消耗推理值", "循环模式  ·  未标记 → 涂色 → 叉号 → 未标记"}[mode];
+            stroke=null;mode=value;
+            modeLabel.text=new[]{"● 涂色模式  ·  按住并横向 / 纵向滑动","× 叉号模式  ·  连续确认空白格","擦除模式  ·  滑动清除标记，不扣推理值"}[mode];
         }
-        private void Click(int r,int c)
+        private void BeginStroke(int row,int col)
         {
-            var mark=mode==0?Mark.Filled:mode==1?Mark.Empty:mode==2?Mark.Unknown:(Mark)(((int)puzzle.Cells[r,c]+1)%3);
-            if(!puzzle.Submit(r,c,mark,out bool error)) return;
-            revisions[r,c]++;
-            sound.PlayOneShot(error?wrong:tap,.22f); Refresh();
-            StartCoroutine(Feedback(r,c,error,generation,revisions[r,c]));
-            if(puzzle.State==Phase.Completed) { sound.PlayOneShot(win,.25f); StartCoroutine(Reveal(generation)); }
+            if(Puzzle==null || Puzzle.State!=Phase.Playing || help.activeSelf)return;
+            stroke=new LineStroke(row,col,mode==0?Mark.Filled:mode==1?Mark.Empty:Mark.Unknown);
+            stroke.Visit(row,col,ApplyMark);
+        }
+        private void MoveStroke(int row,int col)
+        {
+            if(Puzzle==null || Puzzle.State!=Phase.Playing || help.activeSelf) {stroke=null;return;}
+            stroke?.Visit(row,col,ApplyMark);
+        }
+        private void ApplyMark(int row,int col,Mark mark)
+        {
+            if(!Puzzle.Submit(row,col,mark,out bool error))return;
+            revisions[row,col]++;sound.PlayOneShot(error?wrong:tap,.15f);Refresh();
+            if(Puzzle.State==Phase.Completed) {
+                collected[campaign.Index]=true;stroke=null;sound.PlayOneShot(win,.25f);StartCoroutine(Reveal(generation));
+            } else StartCoroutine(Feedback(row,col,error,generation,revisions[row,col]));
         }
         private Color CellColor(int r,int c)
         {
-            var color=puzzle.Cells[r,c]==Mark.Filled?gold:cream;
-            if(puzzle.State==Phase.Locked) color=Color.Lerp(color,Hex("8C8590"),.4f);
-            return color;
+            var color=Puzzle.Cell(r,c)==Mark.Filled?gold:cream;
+            return Puzzle.State==Phase.Locked?Color.Lerp(color,Hex("8C8590"),.4f):color;
         }
         private IEnumerator Feedback(int r,int c,bool error,int epoch,int revision)
         {
-            float elapsed=0;
-            while(elapsed<.23f && epoch==generation && revision==revisions[r,c] && puzzle.State!=Phase.Completed) {
-                elapsed+=Time.unscaledDeltaTime;
-                tiles[r,c].color=Color.Lerp(error?Hex("EB7868"):Color.white,CellColor(r,c),elapsed/.23f);
-                tiles[r,c].transform.localScale=Vector3.one*(1+.05f*Mathf.Sin(elapsed/.23f*Mathf.PI));
-                yield return null;
+            for(float elapsed=0;elapsed<.18f && epoch==generation && revision==revisions[r,c] && Puzzle.State!=Phase.Completed;elapsed+=Time.unscaledDeltaTime) {
+                tiles[r,c].color=Color.Lerp(error?Hex("EB7868"):Color.white,CellColor(r,c),elapsed/.18f);yield return null;
             }
-            if(epoch==generation && revision==revisions[r,c]) { tiles[r,c].transform.localScale=Vector3.one; tiles[r,c].color=CellColor(r,c); }
+            if(epoch==generation && revision==revisions[r,c] && Puzzle.State!=Phase.Completed)tiles[r,c].color=CellColor(r,c);
         }
         private void Reset()
         {
-            if(!puzzle.Reset()) return;
-            generation++; StopAllCoroutines();
-            foreach(var t in tiles) t.transform.localScale=Vector3.one;
-            sound.PlayOneShot(tap,.2f); Refresh();
+            if(!Puzzle.Reset())return;
+            stroke=null;generation++;StopAllCoroutines();sound.PlayOneShot(tap,.2f);Refresh();
         }
         private void Refresh()
         {
-            hearts.text="推理值   "+new string('●',puzzle.Reasoning)+new string('○',5-puzzle.Reasoning);
-            progress.text="已标记  "+puzzle.MarkedCount+" / 25     ·     入门 / 五角星";
-            status.text=puzzle.State==Phase.Locked?"推理值耗尽，无法继续试错。\n点「重置」，重新拾起思路。":puzzle.State==Phase.Completed?"关卡完成！推理成功。\n你拾到了一颗小星星。":"让横与纵的线索相遇，\n答案就藏在交叉的地方。";
-            reset.interactable=puzzle.State!=Phase.Completed;
-            for(int r=0;r<5;r++) for(int c=0;c<5;c++) {
-                tiles[r,c].color=CellColor(r,c);
-                symbols[r,c].text=puzzle.Cells[r,c]==Mark.Empty?"×":"";
-                buttons[r,c].interactable=puzzle.State==Phase.Playing;
+            hearts.text="推理值  "+new string('●',Puzzle.Reasoning)+new string('○',5-Puzzle.Reasoning);
+            progress.text=Puzzle.MarkedCount+" / 225";
+            status.text=Puzzle.State==Phase.Locked?"推理值耗尽 · 点重置，重新拾起思路":Puzzle.State==Phase.Completed?
+                "推理成功！属于你的色彩正在显现…":"数字之间的留白，也是答案的一部分。";
+            reset.interactable=Puzzle.State!=Phase.Completed;
+            for(int r=0;r<15;r++)for(int c=0;c<15;c++) {
+                tiles[r,c].color=CellColor(r,c);symbols[r,c].text=Puzzle.Cell(r,c)==Mark.Empty?"×":"";
             }
         }
         private IEnumerator Reveal(int epoch)
         {
-            for(float t=0;t<1.5f && epoch==generation;t+=Time.unscaledDeltaTime) {
-                float reveal=Mathf.Clamp01(t/.9f);
-                for(int r=0;r<5;r++) for(int c=0;c<5;c++) {
+            for(float t=0;t<1.2f && epoch==generation;t+=Time.unscaledDeltaTime) {
+                for(int r=0;r<15;r++)for(int c=0;c<15;c++) {
+                    float reveal=Mathf.Clamp01((t-r*.026f)/.65f);
                     symbols[r,c].color=new Color(ink.r,ink.g,ink.b,1-reveal);
-                    tiles[r,c].color=Color.Lerp(CellColor(r,c),puzzle.Answer(r,c)?Hex("FFC637"):Color.white,reveal);
+                    tiles[r,c].color=Color.Lerp(CellColor(r,c),Hex(Puzzle.Level.PixelColor(r,c)),reveal);
                 }
-                board.localScale=Vector3.one*(1+.025f*Mathf.Sin(t*Mathf.PI/1.5f));
-                board.GetComponent<Image>().color=Color.Lerp(Hex("DAD3BB"),gold,Mathf.Sin(t*Mathf.PI/1.5f));
-                yield return null;
+                board.GetComponent<Image>().color=Color.Lerp(Hex("DAD3BB"),gold,Mathf.Sin(t/1.2f*Mathf.PI));yield return null;
             }
-            board.localScale=Vector3.one;
+            // Make the completed print seamless, with no crossword marks or guide lines.
+            foreach(Transform child in board)if(child.name.Contains("guide"))child.gameObject.SetActive(false);
+            for(int r=0;r<15;r++)for(int c=0;c<15;c++) {
+                symbols[r,c].text="";tiles[r,c].color=Hex(Puzzle.Level.PixelColor(r,c));
+                tiles[r,c].rectTransform.sizeDelta=new Vector2(Pitch,Pitch);
+            }
             board.GetComponent<Image>().color=gold;
+            status.text=campaign.IsLast?"三幅画都拾到了 · 带着好心情回家吧！":"《"+Puzzle.Level.Title+"》已收好 · 继续下一幅吧！";
+            next.SetActive(true);
+        }
+        private void Advance()
+        {
+            if(!campaign.Advance())return;
+            if(campaign.IsHome)ShowHome();else BuildGame();
         }
         private Image Panel(Transform parent,string title,float x,float y,float width,float height,Color color)
         {
@@ -178,7 +254,7 @@ namespace PixelMoments
         private Button Action(Transform parent,string text,float x,float y,float width,float height,UnityEngine.Events.UnityAction action,Color color)
         {
             var image=Panel(parent,text,x,y,width,height,color);var b=image.gameObject.AddComponent<Button>();
-            b.targetGraphic=image;b.onClick.AddListener(action);Label(image.transform,text,0,0,width,height,22,ink);return b;
+            b.targetGraphic=image;b.onClick.AddListener(action);Label(image.transform,text,0,0,width,height,28,ink);return b;
         }
         private static Color Hex(string value) { ColorUtility.TryParseHtmlString("#"+value,out var color); return color; }
         private Sprite MakePaper()
