@@ -16,6 +16,7 @@ namespace PixelMoments
         public int Reasoning { get; private set; } = InitialReasoning;
         public Phase State { get; private set; } = Phase.Playing;
         public int MarkedCount { get; private set; }
+        public int FilledCount => Enumerable.Range(0,Size).Sum(r => Enumerable.Range(0,Size).Count(c => Answer(r,c) && cells[r,c]==Mark.Filled));
         public Puzzle(Level level = null) { Level = level ?? Levels.All[0]; }
         public Mark Cell(int row,int col) => cells[row,col];
         public bool Answer(int row,int col) => Level.Answer(row,col);
@@ -39,8 +40,9 @@ namespace PixelMoments
             error=mark!=Mark.Unknown && (mark==Mark.Filled)!=Answer(row,col);
             if(error) Reasoning--;
             if(Reasoning==0) { State=Phase.Locked;return true; }
-            if(MarkedCount==Size*Size && Enumerable.Range(0,Size).All(r =>
-                Enumerable.Range(0,Size).All(c => (cells[r,c]==Mark.Filled)==Answer(r,c)))) State=Phase.Completed;
+            // Blank cells may remain unknown or crossed. A stray fill must be erased.
+            if(Enumerable.Range(0,Size).All(r => Enumerable.Range(0,Size).All(c =>
+                Answer(r,c) ? cells[r,c]==Mark.Filled : cells[r,c]!=Mark.Filled))) State=Phase.Completed;
             return true;
         }
         public bool Reset()

@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace PixelMoments
 {
-    // Each non-dot pixel has a reveal color. Clues are always derived from occupancy.
+    // One pixel source supplies live paint, color-run clues, and the completed print.
     public sealed class Level
     {
         public const int Size = 15;
@@ -14,6 +14,8 @@ namespace PixelMoments
         public string Difficulty { get; }
         public string Description { get; }
         public string Accent { get; }
+        public int FilledCount => art.Sum(row => row.Count(c => c != '.'));
+        public char PixelKey(int row,int col) => art[row][col];
         public int Segments => Enumerable.Range(0, Size).Sum(i => RowClues(i).Length + ColumnClues(i).Length);
         public Level(string id, string title, string difficulty, string description, string accent, string[] pixels)
         {
@@ -25,17 +27,40 @@ namespace PixelMoments
             art=(string[])pixels.Clone();
         }
         public bool Answer(int row, int col) => art[row][col] != '.';
-        public string PixelColor(int row, int col)
+        public string PixelColor(int row,int col) => PaletteColor(art[row][col]);
+        public static string PaletteColor(char key)
         {
-            switch (art[row][col]) {
+            switch (key) {
                 case 'Y': return "F7C542"; case 'O': return "EF9144"; case 'G': return "69A85D";
                 case 'B': return "64ACCE"; case 'R': return "E67762"; case 'C': return "A1D9CF";
                 case 'W': return "FFF1C6"; case 'D': return "4B5763"; case 'T': return "AD754F";
                 default: return "FFF8E8";
             }
         }
+        public ColorClue[] RowColorClues(int row) => ColorClues(Enumerable.Range(0,Size).Select(c => art[row][c]));
+        public ColorClue[] ColumnColorClues(int col) => ColorClues(Enumerable.Range(0,Size).Select(r => art[r][col]));
+        public static ColorClue[] ColorClues(IEnumerable<char> pixels)
+        {
+            var result=new List<ColorClue>();char previous='.';int count=0;
+            foreach(char key in pixels) {
+                if(key==previous) {count++;continue;}
+                if(previous!='.')result.Add(new ColorClue(previous,count));
+                previous=key;count=1;
+            }
+            if(previous!='.')result.Add(new ColorClue(previous,count));
+            return result.ToArray();
+        }
+        // Binary silhouette clues remain available for offline difficulty diagnostics.
         public int[] RowClues(int row) => Puzzle.Clues(Enumerable.Range(0,Size).Select(c => Answer(row,c)));
         public int[] ColumnClues(int col) => Puzzle.Clues(Enumerable.Range(0,Size).Select(r => Answer(r,col)));
+    }
+
+    public struct ColorClue
+    {
+        public char Key { get; }
+        public int Length { get; }
+        public string Color => Level.PaletteColor(Key);
+        public ColorClue(char key,int length) {Key=key;Length=length;}
     }
 
     public static class Levels
@@ -79,14 +104,14 @@ namespace PixelMoments
                 ".BB.........BB.",
                 ".BCC..D.D..CCB.",
                 ".BCOC..D..COCB.",
-                ".BC.OC.D.CO.CB.",
-                "..BC.OCDCO.CB..",
+                ".BCOOC.D.COOCB.",
+                "..BCOOCDCOOCB..",
                 "..BCOCCDCCOCB..",
                 "...BCCDDDCCB...",
                 "....BBBDBBB....",
                 "...RROODOORR...",
-                "..RR.OODOO.RR..",
-                "..RY.OWDWO.YR..",
+                "..RROOODOOORR..",
+                "..RYOOWDWOOYR..",
                 "..RYOW.D.WOYR..",
                 "...RY..D..YR...",
                 "....R.....R....",

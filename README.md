@@ -1,64 +1,52 @@
 # 像素拾光 · Pixel Moments
 
-**Unity 2022.3.62f3c1（中国版）** 数织解谜游戏。手机 **9:16 竖屏**，内部设计分辨率 900×1600；暖纸底色搭配鲜明的黄、橙、绿、蓝，平面像素画与轻微纸张颗粒，避免塑料高光。
+**Unity 2022.3.62f3c1（中国版）** 彩色数织游戏。整个游戏画幅为 **9:16 竖屏，900×1600**，包括主页、棋盘、帮助和通关页。鲜明的黄、橙、绿、蓝与暖纸底搭配，避免塑料高光。
 
-## 打开与试玩
+## 试玩
 
-1. Unity Hub 添加仓库，用 **2022.3.62f3c1** 打开，等待 UGUI 与 Test Framework 解析完成。
-2. 打开 `Assets/Scenes/PixelMoments.unity`；编辑器会自动将整个 Game 视图的渲染分辨率设为 **900×1600（9:16）**，点击 Play。也可用菜单 `Pixel Moments > Set entire Game View to 9 x 16` 恢复此设置。
-3. 从主页选择关卡。选择「涂色」「叉号」或「擦除」后，点击或按住并横向／纵向滑动。
-4. 起点格立即标记，首次跨格移动锁定一行或一列；快速滑动会补齐中间格，回划同一格不重复提交。松手后可以另起一笔。
-5. 全部 225 格都正确才通关，图像从上到下显色。前两关点「下一关」，第三关点「返回主页」。完成画面保留到点击按钮，不自动跳走。
+1. 用指定 Unity 打开仓库，等待 UGUI / Test Framework 解析，打开 `Assets/Scenes/PixelMoments.unity`。
+2. Game View 自动设为 900×1600；若需手动恢复，使用 `Pixel Moments > Set entire Game View to 9 x 16`。
+3. 在主页选择关卡，选「涂色」后点击或自由滑动，**横、竖、斜线、转弯均可**。沿途格子会补齐，同笔经过同一格不重复提交。颜色由对应图案像素自动填入，无需选颜色。
+4. **只要所有图案格涂对，且没有多涂空白，就能通关。叉号可选。** 多涂的空白用擦除修正。进度显示正确涂色格数／图案格总数。
+5. 前两关完成后点「下一关」；第三关完成后点「返回主页」。
 
-整个游戏输出采用 9:16 竖屏：主页、选关、棋盘、帮助和通关均共用全屏 Canvas，桌面播放器启动时设置整个窗口为 900×1600。手机锁定竖屏，背景铺满屏幕，UI 根节点伸展至安全区，不再将固定比例的可玩模块缩放嵌入横屏画布。支持单指触屏和鼠标左键拖动，多指不会同时画多笔。
+支持单指触屏与鼠标左键；第二根手指不会接管当前笔画。移出棋盘后只处理实际穿过棋盘的线段，不沿边缘虚画。换工具、重置、切换页面或失焦会结束笔画。
 
-## 三幅完整画作
+## 彩色行列线索
 
-| 关卡 | 难度 | 内容 | 行线索初始可确定格数 | 行列分段总数 |
-| --- | --- | --- | --- | --- |
-| 向阳花开 | 入门 | 金黄花盘、种子、绿叶与花盆 | 75 | 38 |
-| 晴日小屋 | 进阶 | 珊瑚屋顶、烟囱、留白窗格、木门与草地 | 59 | 44 |
-| 花间来信 | 挑战 | 蓝绿上翅、橙黄下翅、对称斑纹与触角 | 31 | 60 |
+左侧和顶部使用相同规则：**有底色的数字块表示一段连续同色格子的数量**，左侧按从左到右排列，顶部按从上到下排列，并与对应行／列对齐。
 
-三个关卡均为 **15×15、唯一解**，能通过行列约束传播解出；难度梯度来自更少的初始确定格和更多分段，需要更多交叉推理。难度标签是设计梯度，仍需真人试玩校准。
+例如黄底 `2`、橙底 `1` 表示连续两个黄色格，再出现一个橙色格。不同颜色可以直接相邻；相同颜色的两段之间至少有一个空白。整行／列为空则显示 `0`。玩家只需确定位置，系统自动使用目标颜色。
 
-![三幅画作预览（答案展示，非 Unity 截图）](Documentation/Art/Levels.png)
+## 使用指定的三幅图
 
-## 规则
+![用户选定的图像，直接从游戏像素源导出；非 Unity 截图](Documentation/Art/Levels.png)
 
-每关 5 点推理值。错误填色或叉号扣 1 点；正确标记、擦除、重复提交同一状态不扣分。降至 0 后棋盘锁定，重置会清除全部标记并恢复 5 点。滑动并非免费试错：每个新格的错误提交仍各扣 1 点，归零立即停止。
+| 关卡 | 难度 | 需要填色格数 | 彩色线索初始可确定格 |
+| --- | --- | --- | --- |
+| 向阳花开 | 入门 | 131 | 53 |
+| 晴日小屋 | 进阶 | 124 | 42 |
+| 花间来信 | 挑战 | 117 | 15 |
 
-完成状态不可再改图或重置。返回主页后可以重新选择任意关卡。主页收集勾选仅记录本次应用运行，退出不保存棋盘进度。
+已恢复附图中蝴蝶没有额外镂空的版本。三幅图的全部 **675 个像素**与此前参考图采样一致，并以 RGB SHA-256 测试防止后续漂移。填色、行列线索、主页预览、最终成图都读取 `Level.cs` 同一份数据；完成图使用 Point 过滤的 15×15 纹理，保留方正像素，不用圆角格拼出另一种轮廓。
 
-## 构建
+三题按实际彩色线索求解均恰好一解，可通过行列约束传播完成；初始可确定格递减。难度标签仍需真人试玩校准。
 
-- Android：通过 Hub 安装 **Android Build Support / SDK / NDK / OpenJDK**。菜单 `Pixel Moments > Build Android APK`，生成 `Builds/Android/PixelMoments.apk`（ARM64 / IL2CPP，最低 Android 6.0）。
-- Windows：安装 Windows Build Support，菜单 `Pixel Moments > Build Windows Demo`，生成 `Builds/Windows/PixelMoments.exe`，同样为竖屏窗口。
-- 命令行（指定编辑器已经安装且激活时）：
+## 推理值
 
-```sh
-"$UNITY_EDITOR" -batchmode -nographics -quit -projectPath "$PWD" -executeMethod PixelMoments.Editor.ProjectSetup.BuildAndroid -logFile Builds-unity.log
-```
+每关 5 点。每个新错误填色或叉号扣 1；正确标记、擦除与相同状态重复提交不扣分。同笔去重不代表免费试错，滑过多个错误格仍逐格扣分，归零立即锁定。重置清盘并恢复 5 点。
 
-**当前云环境没有 Unity 编辑器和许可证，没有生成或验收 APK / EXE。**
+完成后不可再修改或重置。主页收集勾选仅保留本次运行，退出不保存棋盘。
 
-## 测试与结构
+## 构建与验证
 
-Unity：`Window > General > Test Runner > EditMode > Run All`。
+- Android：Hub 安装 Android Build Support、SDK、NDK、OpenJDK；菜单 `Pixel Moments > Build Android APK`，输出 `Builds/Android/PixelMoments.apk`（ARM64 / IL2CPP）。
+- Windows：安装 Windows Build Support；菜单 `Pixel Moments > Build Windows Demo`，输出 `Builds/Windows/PixelMoments.exe`，整个窗口为竖屏。
+- Unity 测试：`Window > General > Test Runner > EditMode > Run All`。
+- 独立测试：安装 .NET SDK 8 后运行 `dotnet test Tools/CoreTests/CoreTests.csproj`。
 
-独立规则测试（.NET SDK 8）：
+**39 项独立测试通过，0 失败、0 跳过。当前云环境没有 Unity 编辑器或授权，尚未验证 Unity 导入、真实触屏和 APK / EXE 构建。** 详细记录见 [Validation.md](Documentation/Validation.md)。
 
-```sh
-dotnet test Tools/CoreTests/CoreTests.csproj
-```
+代码分工：`Level.cs` 像素与线索；`Puzzle.cs` 规则与流程；`LineStroke.cs` 自由笔画网格遍历；`BoardInput.cs` 指针采集；`ColorNonogramSolver.cs` 彩色题验证；`GameView.cs` 运行界面。`NonogramSolver.cs` 保留为二值轮廓诊断工具，不用于界面彩色数字。
 
-本次独立测试 **22 项通过，0 失败，0 跳过**；覆盖唯一解、难度指标、225 格通关、错误锁定重置、滑动补格与去重、三关流程。详情及手机验收步骤见 [Validation.md](Documentation/Validation.md)。
-
-- `Level.cs`：三幅彩色像素画和关卡配置，自动生成线索。
-- `Puzzle.cs`：逐格规则与主页／三关流程。
-- `LineStroke.cs`：与 Unity 解耦的行列锁定、补格和去重。
-- `NonogramSolver.cs`：题目候选生成、约束传播与唯一解验证。
-- `BoardInput.cs`：单指／鼠标手势采集。
-- `GameView.cs`：竖屏主页、棋盘、工具、揭图与通关导航。
-
-中文字体为 Noto Sans SC（SIL OFL，许可证和来源随项目提供）；音效为程序合成，无背景音乐。源码直接提交 GitHub，不提交 Library、缓存、构建产物或密钥。
+中文字体为 Noto Sans SC（SIL OFL，来源和许可随项目提供），提示音为程序合成，无背景音乐。源码直接提交 GitHub，不提交缓存、构建产物或密钥。

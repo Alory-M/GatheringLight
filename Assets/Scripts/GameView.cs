@@ -26,7 +26,7 @@ namespace PixelMoments
         private Sprite rounded;
         private int mode,generation;
         private LineStroke stroke;
-        private const float Pitch=42,BoardSize=Pitch*15;
+        private const float Pitch=40,BoardSize=Pitch*15;
         private Rect lastSafe;
         private Vector2 lastScreen;
 
@@ -102,15 +102,31 @@ namespace PixelMoments
                 Label(card.transform,level.Difficulty+"  ·  15 × 15",-10,-33,370,46,25,ink);
                 Action(card.transform,"拾光 →",266,0,170,75,()=>StartLevel(index),Hex(level.Accent));
             }
-            Label(page,"按住滑动，整行或整列连续标记\n没有倒计时，让思考慢一点。",0,-592,780,100,27,ink);
+            Label(page,"自由滑动，斜着也能连续涂色\n没有倒计时，让思考慢一点。",0,-592,780,100,27,ink);
             Label(page,"黄花 · 小屋 · 蝶舞",0,-717,780,42,22,ink);
         }
         private void Miniature(Transform parent,Level level,float x,float y,float pitch)
         {
-            for(int r=0;r<15;r++)for(int c=0;c<15;c++)if(level.Answer(r,c)) {
-                var image=Panel(parent,"Pixel",x+(c-7)*pitch,y+(7-r)*pitch,pitch,pitch,Hex(level.PixelColor(r,c)));
-                image.raycastTarget=false;
-            }
+            var image=Panel(parent,"Reference art",x,y,15*pitch,15*pitch,Color.white);
+            image.sprite=ArtSprite(level);image.type=Image.Type.Simple;image.raycastTarget=false;
+        }
+        private readonly System.Collections.Generic.Dictionary<string,Sprite> artSprites=new System.Collections.Generic.Dictionary<string,Sprite>();
+        private Sprite ArtSprite(Level level)
+        {
+            if(artSprites.TryGetValue(level.Id,out var existing))return existing;
+            var texture=new Texture2D(15,15,TextureFormat.RGBA32,false);
+            texture.filterMode=FilterMode.Point;texture.wrapMode=TextureWrapMode.Clamp;
+            for(int r=0;r<15;r++)for(int c=0;c<15;c++)texture.SetPixel(c,14-r,Hex(level.PixelColor(r,c)));
+            texture.Apply();var sprite=Sprite.Create(texture,new Rect(0,0,15,15),new Vector2(.5f,.5f),15);
+            artSprites.Add(level.Id,sprite);return sprite;
+        }
+        private void Clue(Transform parent,ColorClue clue,float x,float y,float width,float height)
+        {
+            // Dark text on the exact color is legible even for cream-colored runs.
+            var chip=Panel(parent,"Clue "+clue.Key+" "+clue.Length,x,y,width,height,Hex(clue.Color));
+            chip.raycastTarget=false;
+            var text=Label(chip.transform,clue.Length.ToString(),0,0,width,height,20,clue.Key=='D'?Color.white:Hex("252B30"));
+            text.horizontalOverflow=HorizontalWrapMode.Overflow;
         }
         private void StartLevel(int index) {campaign.Start(index);BuildGame();}
         private void BuildGame()
@@ -124,13 +140,14 @@ namespace PixelMoments
             Label(page,level.Difficulty+"  ·  "+level.Description,0,550,820,64,24,ink);
             hearts=Label(page,"",-150,467,490,52,27,ink);
             progress=Label(page,"",285,467,240,52,25,ink);
-            // 630px board + 168px row clues. Column clues stack in 8 fixed slots.
+            // Leave room for nine colored clues on either axis.
             Panel(page,"Puzzle paper",0,-24,850,920,Color.white);
-            board=Panel(page,"Board",84,-133,BoardSize,BoardSize,Hex("DAD3BB")).rectTransform;
+            board=Panel(page,"Board",102,-155,BoardSize,BoardSize,Hex("DAD3BB")).rectTransform;
             tiles=new Image[15,15];symbols=new Text[15,15];revisions=new int[15,15];
             for(int r=0;r<15;r++)for(int c=0;c<15;c++) {
                 float x=(c-7)*Pitch,y=(7-r)*Pitch;
                 var image=Panel(board,"Cell "+r+" "+c,x,y,Pitch-3,Pitch-3,cream);
+                image.sprite=null;image.type=Image.Type.Simple;
                 image.raycastTarget=false;tiles[r,c]=image;
                 symbols[r,c]=Label(image.transform,"",0,0,Pitch-3,Pitch-3,26,ink);
             }
@@ -140,11 +157,13 @@ namespace PixelMoments
                 Panel(board,"Row guide",0,BoardSize/2-i*5*Pitch,BoardSize,2,ink).raycastTarget=false;
             }
             for(int i=0;i<15;i++) {
-                var rows=level.RowClues(i);var cols=level.ColumnClues(i);
-                // Row clues use fixed slots as well, so 8-segment clues never overflow.
-                int slots=Mathf.Max(1,rows.Length);
-                for(int j=0;j<slots;j++)Label(page,rows.Length==0?"0":rows[j].ToString(),-245-(slots-1-j)*23,161-i*Pitch,25,38,23,ink);
-                for(int j=0;j<Mathf.Max(1,cols.Length);j++)Label(page,cols.Length==0?"0":cols[j].ToString(),-210+i*Pitch,207+(Mathf.Max(1,cols.Length)-1-j)*27,Pitch,29,23,ink);
+                var rows=level.RowColorClues(i);var cols=level.ColumnColorClues(i);
+                if(rows.Length==0)Label(page,"0",-218,125-i*Pitch,24,30,20,ink);
+                for(int j=0;j<rows.Length;j++)
+                    Clue(page,rows[j],-218-(rows.Length-1-j)*23,125-i*Pitch,22,30);
+                if(cols.Length==0)Label(page,"0",-178+i*Pitch,172,32,27,20,ink);
+                for(int j=0;j<cols.Length;j++)
+                    Clue(page,cols[j],-178+i*Pitch,172+(cols.Length-1-j)*28,32,26);
             }
             var input=board.gameObject.AddComponent<BoardInput>();
             input.Begin=BeginStroke;input.Move=MoveStroke;input.End=()=>stroke=null;
@@ -156,7 +175,7 @@ namespace PixelMoments
             reset=Action(page,"重置",322,-677,174,78,Reset,Hex("F28B64"));
             next=Action(page,campaign.IsLast?"收集完成 · 返回主页":"画作已收好 · 下一关 →",0,-677,780,90,Advance,Hex(level.Accent)).gameObject;
             next.SetActive(false);
-            Label(page,"长按滑动  ·  首次移动锁定行 / 列  ·  每格每次只标记一次",0,-754,860,38,20,ink);
+            Label(page,"自由滑动 · 支持斜线和转弯 · 自动使用图案颜色",0,-754,860,38,20,ink);
             BuildHelp();SetMode(0);Refresh();
         }
         private void BuildHelp()
@@ -164,22 +183,22 @@ namespace PixelMoments
             help=Panel(page,"Help",0,0,900,1600,new Color(.20f,.23f,.27f,.65f)).gameObject;
             var card=Panel(help.transform,"Help card",0,0,820,990,cream);
             Label(card.transform,"一点点，拼出整幅画",0,385,750,80,40,ink);
-            Label(card.transform,"数字表示连续色块的长度。\n多段数字之间，至少留一个空白。\n\n选「涂色」或「叉号」，按住棋盘滑动。\n第一次移动决定横向或纵向，\n快速划过的格子也会连续标记。\n\n全部 225 格都要正确标记，才能揭图。\n每次错误标记扣 1 点，归零只能重置。\n擦除不扣分，同一次滑动不重复标记。\n\n完成后点下一关，第三关完成后返回主页。",0,0,740,650,29,ink);
+            Label(card.transform,"左右、上下都看彩色数字线索。\n数字是该颜色连续出现的格数。\n同色两段之间要留空，不同颜色可以相邻。\n\n选「涂色」，手指滑过的格子都会涂色。\n支持斜线和转弯，颜色由图案自动填入。\n快速滑动会补齐沿途格子，不会重复扣值。\n\n图案格全部涂对即可通关，叉号可选。\n多涂的空白格需要擦除。\n标错扣 1 点，归零后点重置重新开始。\n\n前两关点下一关，最后一关返回主页。",0,0,740,650,27,ink);
             Action(card.transform,"明白了，慢慢画",0,-389,540,88,()=>help.SetActive(false),gold);
             help.SetActive(false);
         }
         private void SetMode(int value)
         {
             stroke=null;mode=value;
-            modeLabel.text=new[]{"● 涂色模式  ·  按住并横向 / 纵向滑动","× 叉号模式  ·  连续确认空白格","擦除模式  ·  滑动清除标记，不扣推理值"}[mode];
+            modeLabel.text=new[]{"● 自由涂色 · 斜线 / 转弯皆可，颜色自动填入","× 叉号模式  ·  连续确认空白格","擦除模式  ·  滑动清除标记，不扣推理值"}[mode];
         }
-        private void BeginStroke(int row,int col)
+        private void BeginStroke(float row,float col)
         {
             if(Puzzle==null || Puzzle.State!=Phase.Playing || help.activeSelf)return;
             stroke=new LineStroke(row,col,mode==0?Mark.Filled:mode==1?Mark.Empty:Mark.Unknown);
             stroke.Visit(row,col,ApplyMark);
         }
-        private void MoveStroke(int row,int col)
+        private void MoveStroke(float row,float col)
         {
             if(Puzzle==null || Puzzle.State!=Phase.Playing || help.activeSelf) {stroke=null;return;}
             stroke?.Visit(row,col,ApplyMark);
@@ -194,13 +213,13 @@ namespace PixelMoments
         }
         private Color CellColor(int r,int c)
         {
-            var color=Puzzle.Cell(r,c)==Mark.Filled?gold:cream;
+            var color=Puzzle.Cell(r,c)==Mark.Filled?Hex(Puzzle.Answer(r,c)?Puzzle.Level.PixelColor(r,c):"E67762"):cream;
             return Puzzle.State==Phase.Locked?Color.Lerp(color,Hex("8C8590"),.4f):color;
         }
         private IEnumerator Feedback(int r,int c,bool error,int epoch,int revision)
         {
             for(float elapsed=0;elapsed<.18f && epoch==generation && revision==revisions[r,c] && Puzzle.State!=Phase.Completed;elapsed+=Time.unscaledDeltaTime) {
-                tiles[r,c].color=Color.Lerp(error?Hex("EB7868"):Color.white,CellColor(r,c),elapsed/.18f);yield return null;
+                tiles[r,c].color=Color.Lerp(error?Hex("EB7868"):Color.Lerp(CellColor(r,c),Color.white,.18f),CellColor(r,c),elapsed/.18f);yield return null;
             }
             if(epoch==generation && revision==revisions[r,c] && Puzzle.State!=Phase.Completed)tiles[r,c].color=CellColor(r,c);
         }
@@ -212,9 +231,9 @@ namespace PixelMoments
         private void Refresh()
         {
             hearts.text="推理值  "+new string('●',Puzzle.Reasoning)+new string('○',5-Puzzle.Reasoning);
-            progress.text=Puzzle.MarkedCount+" / 225";
+            progress.text=Puzzle.FilledCount+" / "+Puzzle.Level.FilledCount;
             status.text=Puzzle.State==Phase.Locked?"推理值耗尽 · 点重置，重新拾起思路":Puzzle.State==Phase.Completed?
-                "推理成功！属于你的色彩正在显现…":"数字之间的留白，也是答案的一部分。";
+                "画好啦！正在收好你的作品…":"涂完全部图案格即可通关 · 空白不必打叉";
             reset.interactable=Puzzle.State!=Phase.Completed;
             for(int r=0;r<15;r++)for(int c=0;c<15;c++) {
                 tiles[r,c].color=CellColor(r,c);symbols[r,c].text=Puzzle.Cell(r,c)==Mark.Empty?"×":"";
@@ -230,13 +249,9 @@ namespace PixelMoments
                 }
                 board.GetComponent<Image>().color=Color.Lerp(Hex("DAD3BB"),gold,Mathf.Sin(t/1.2f*Mathf.PI));yield return null;
             }
-            // Make the completed print seamless, with no crossword marks or guide lines.
-            foreach(Transform child in board)if(child.name.Contains("guide"))child.gameObject.SetActive(false);
-            for(int r=0;r<15;r++)for(int c=0;c<15;c++) {
-                symbols[r,c].text="";tiles[r,c].color=Hex(Puzzle.Level.PixelColor(r,c));
-                tiles[r,c].rectTransform.sizeDelta=new Vector2(Pitch,Pitch);
-            }
-            board.GetComponent<Image>().color=gold;
+            foreach(Transform child in board)child.gameObject.SetActive(false);
+            var print=Panel(board,"Completed reference print",0,0,BoardSize,BoardSize,Color.white);
+            print.sprite=ArtSprite(Puzzle.Level);print.type=Image.Type.Simple;print.raycastTarget=false;
             status.text=campaign.IsLast?"三幅画都拾到了 · 带着好心情回家吧！":"《"+Puzzle.Level.Title+"》已收好 · 继续下一幅吧！";
             next.SetActive(true);
         }
